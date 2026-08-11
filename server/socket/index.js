@@ -30,12 +30,21 @@ const {
   STICKER_SENT,
   MINIGAME_TAP,
   MINIGAME_PROGRESS,
+  VOICE_JOIN,
+  VOICE_LEAVE,
+  VOICE_PEERS,
+  VOICE_PEER_JOINED,
+  VOICE_PEER_LEFT,
+  VOICE_SIGNAL,
+  VOICE_ROSTER,
 } = require('../pokergame/actions');
 const { STICKER_COUNT } = require('../pokergame/ceki/constants');
 const config = require('../config');
 
 const roomManager = new RoomManager();
 const players = {};
+// roomCode -> Set of seatIds currently on voice chat.
+const voiceMembers = new Map();
 
 function getCurrentPlayers() {
   return Object.values(players).map((player) => ({
@@ -188,6 +197,70 @@ const init = (socket, io) => {
     });
   });
 
+  // --- Voice chat signalling ----------------------------------------------
+  //
+  // Pure relay. The server never sees or forwards audio -- it only passes the
+  // WebRTC handshake (offer/answer/ICE) between two seats so they can open a
+  // direct connection to each other. `voiceMembers` tracks who currently has
+  // their mic on, per room, so a seat joining late knows who to call.
+
+  function voiceRoster(room) {
+    return Array.from(voiceMembers.get(room.code) || []);
+  }
+
+  function leaveVoice(room, seatId, { silent } = {}) {
+    const members = voiceMembers.get(room.code);
+    if (!members || !members.has(seatId)) return;
+    members.delete(seatId);
+    if (members.size === 0) voiceMembers.delete(room.code);
+    if (!silent) {
+      io.to(room.code).emit(VOICE_PEER_LEFT, { seatId });
+      io.to(room.code).emit(VOICE_ROSTER, { seatIds: voiceRoster(room) });
+    }
+  }
+
+  socket.on(VOICE_JOIN, ({ code }) => {
+    safe(() => {
+      const room = roomManager.getRoom(code);
+      if (!room) throw new GameError('Room not found');
+      const seatId = requireSeatId(room);
+
+      if (!voiceMembers.has(code)) voiceMembers.set(code, new Set());
+      const members = voiceMembers.get(code);
+
+      // Whoever is already in gets told to expect a call; the joiner gets the
+      // existing list and is the one that initiates, so both sides never try
+      // to call each other at the same time (glare).
+      const existing = Array.from(members).filter((id) => id !== seatId);
+      members.add(seatId);
+
+      socket.emit(VOICE_PEERS, { seatIds: existing });
+      socket.to(code).emit(VOICE_PEER_JOINED, { seatId });
+      io.to(code).emit(VOICE_ROSTER, { seatIds: voiceRoster(room) });
+    });
+  });
+
+  socket.on(VOICE_LEAVE, ({ code }) => {
+    safe(() => {
+      const room = roomManager.getRoom(code);
+      if (!room) return;
+      const seat = room.table.findSeatByPlayerId(requirePlayer().id);
+      if (!seat) return;
+      leaveVoice(room, seat.id);
+    });
+  });
+
+  socket.on(VOICE_SIGNAL, ({ code, toSeatId, data }) => {
+    safe(() => {
+      const room = roomManager.getRoom(code);
+      if (!room) throw new GameError('Room not found');
+      const fromSeatId = requireSeatId(room);
+      const target = room.table.seats[toSeatId];
+      if (!target || !target.connected || !target.player.socketId) return;
+      io.to(target.player.socketId).emit(VOICE_SIGNAL, { fromSeatId, data });
+    });
+  });
+
   socket.on(DRAW_CARD, ({ code }) => {
     safe(() => {
       const room = requireActiveRoom(code);
@@ -239,7 +312,12 @@ const init = (socket, io) => {
   socket.on(DISCONNECT, () => {
     delete players[socket.id];
     const found = roomManager.detachSocket(socket.id);
-    if (found) broadcastRoomState(found.room);
+    if (found) {
+      // Otherwise a dropped player lingers in the voice roster forever and
+      // everyone keeps a dead peer connection open for them.
+      leaveVoice(found.room, found.seat.id);
+      broadcastRoomState(found.room);
+    }
 
     socket.broadcast.emit(PLAYERS_UPDATED, getCurrentPlayers());
   });

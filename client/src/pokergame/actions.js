@@ -43,3 +43,13 @@ export const SEND_STICKER = 'SEND_STICKER';
 export const STICKER_SENT = 'STICKER_SENT';
 export const MINIGAME_TAP = 'MINIGAME_TAP';
 export const MINIGAME_PROGRESS = 'MINIGAME_PROGRESS';
+
+// --- Voice chat (WebRTC signalling) ---------------------------------------
+// KEEP IN SYNC WITH server/pokergame/actions.js
+export const VOICE_JOIN = 'VOICE_JOIN';
+export const VOICE_LEAVE = 'VOICE_LEAVE';
+export const VOICE_PEERS = 'VOICE_PEERS';
+export const VOICE_PEER_JOINED = 'VOICE_PEER_JOINED';
+export const VOICE_PEER_LEFT = 'VOICE_PEER_LEFT';
+export const VOICE_SIGNAL = 'VOICE_SIGNAL';
+export const VOICE_ROSTER = 'VOICE_ROSTER';

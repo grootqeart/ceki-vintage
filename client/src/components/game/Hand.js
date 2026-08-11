@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import PokerCard from './PokerCard';
 import { bestMeldedSubset } from '../../pokergame/ceki/combinations';
 import { cardValue } from '../../pokergame/ceki/cardUtils';
 import { RANK_ORDER } from '../../pokergame/ceki/constants';
 
 const DRAG_THRESHOLD = 8; // px of movement before a press counts as a drag, not a tap
+const DRAG_LIFT_PX = 14; // how far a held card rises off the fan
+const AUTOSCROLL_EDGE = 48; // px from either edge where auto-scroll kicks in
+const AUTOSCROLL_MAX_PX = 14; // px per frame at the very edge
 const SUIT_ORDER = { s: 0, h: 1, d: 2, c: 3 };
 
 const StyledWrapper = styled.div`
@@ -40,13 +43,22 @@ const StyledHand = styled.div`
 
 const StyledCardSlot = styled.div`
   touch-action: none;
-  cursor: ${({ draggable }) => (draggable ? 'grab' : 'default')};
+  cursor: ${({ draggable, dragging }) =>
+    dragging ? 'grabbing' : draggable ? 'grab' : 'default'};
   flex: 0 0 auto;
   position: relative;
 
   &:not(:first-child) {
     margin-left: -2.4rem;
   }
+
+  ${({ dragging }) =>
+    dragging &&
+    css`
+      /* No transition while held -- the transform is driven straight from
+         pointer events, and easing it would make the card lag the finger. */
+      filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
+    `}
 `;
 
 function meldCardRank(card, meld) {
@@ -138,8 +150,13 @@ function computeSortedOrder(cards) {
 const Hand = ({ cards, selectedIds = [], onToggle, disabled, sortable, disabledCardIds = [] }) => {
   const [order, setOrder] = useState(cards.map((c) => c.id));
   const [draggingId, setDraggingId] = useState(null);
+  // Live pointer offset of the card being dragged, so it tracks the finger
+  // instead of sitting still until the order happens to change.
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const dragState = useRef({ id: null, startX: 0, startY: 0, moved: false });
   const slotRefs = useRef({}); // cardId -> DOM node, used to measure drag targets
+  const scrollerRef = useRef(null);
+  const autoScrollRef = useRef({ raf: null, dx: 0 });
 
   useEffect(() => {
     setOrder((prev) => {
@@ -153,13 +170,72 @@ const Hand = ({ cards, selectedIds = [], onToggle, disabled, sortable, disabledC
   const byId = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
   const orderedCards = order.map((id) => byId[id]).filter(Boolean);
 
+  // Finding the best meld partition is a bitmask DP over the whole hand, and
+  // the order changes on every card the drag crosses -- running it mid-drag
+  // put that search in the middle of the gesture. The highlight can't be
+  // right until the card lands anyway, so freeze the last result while a
+  // drag is in flight and recompute once on drop.
   const orderKey = orderedCards.map((c) => c.id).join(',');
-  const meldGroupByCardId = useMemo(() => computeMeldGroups(orderedCards), [orderKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const meldKey = draggingId ? null : orderKey;
+  const lastMeldGroups = useRef({});
+  const meldGroupByCardId = useMemo(() => {
+    if (meldKey === null) return lastMeldGroups.current;
+    lastMeldGroups.current = computeMeldGroups(orderedCards);
+    return lastMeldGroups.current;
+  }, [meldKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Nudges the horizontally-scrollable hand while a drag is held near either
+  // edge. Without it a card simply can't be moved to a position that's
+  // currently off-screen, since the container never scrolls on its own during
+  // a pointer-captured drag.
+  function stopAutoScroll() {
+    if (autoScrollRef.current.raf !== null) {
+      cancelAnimationFrame(autoScrollRef.current.raf);
+      autoScrollRef.current.raf = null;
+    }
+    autoScrollRef.current.dx = 0;
+  }
+
+  function stepAutoScroll() {
+    const el = scrollerRef.current;
+    const { dx } = autoScrollRef.current;
+    if (!el || dx === 0) {
+      autoScrollRef.current.raf = null;
+      return;
+    }
+    el.scrollLeft += dx;
+    autoScrollRef.current.raf = requestAnimationFrame(stepAutoScroll);
+  }
+
+  function updateAutoScroll(clientX) {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const overflows = el.scrollWidth > el.clientWidth + 1;
+    let dx = 0;
+    if (overflows) {
+      const intoLeft = clientX - rect.left;
+      const intoRight = rect.right - clientX;
+      // Speed ramps up the closer the finger gets to the edge.
+      if (intoLeft < AUTOSCROLL_EDGE) {
+        dx = -Math.ceil(((AUTOSCROLL_EDGE - Math.max(intoLeft, 0)) / AUTOSCROLL_EDGE) * AUTOSCROLL_MAX_PX);
+      } else if (intoRight < AUTOSCROLL_EDGE) {
+        dx = Math.ceil(((AUTOSCROLL_EDGE - Math.max(intoRight, 0)) / AUTOSCROLL_EDGE) * AUTOSCROLL_MAX_PX);
+      }
+    }
+    autoScrollRef.current.dx = dx;
+    if (dx !== 0 && autoScrollRef.current.raf === null) {
+      autoScrollRef.current.raf = requestAnimationFrame(stepAutoScroll);
+    } else if (dx === 0) {
+      stopAutoScroll();
+    }
+  }
 
   function handlePointerDown(e, cardId) {
     if (!sortable) return;
     dragState.current = { id: cardId, startX: e.clientX, startY: e.clientY, moved: false };
     setDraggingId(cardId);
+    setDragOffset({ x: 0, y: 0 });
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
@@ -172,6 +248,9 @@ const Hand = ({ cards, selectedIds = [], onToggle, disabled, sortable, disabledC
       if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
       state.moved = true;
     }
+
+    setDragOffset({ x: e.clientX - state.startX, y: e.clientY - state.startY });
+    updateAutoScroll(e.clientX);
 
     // Find whichever card slot's horizontal center is closest to the
     // pointer, and move the dragged card there. Measuring live DOM rects
@@ -193,31 +272,44 @@ const Hand = ({ cards, selectedIds = [], onToggle, disabled, sortable, disabledC
     }
     if (!closestId || closestId === state.id) return;
 
-    setOrder((prev) => {
-      const from = prev.indexOf(state.id);
-      const to = prev.indexOf(closestId);
-      if (from === -1 || to === -1 || from === to) return prev;
-      const next = [...prev];
-      next.splice(from, 1);
-      next.splice(to, 0, state.id);
-      return next;
-    });
+    const from = order.indexOf(state.id);
+    const to = order.indexOf(closestId);
+    if (from === -1 || to === -1 || from === to) return;
+    const next = [...order];
+    next.splice(from, 1);
+    next.splice(to, 0, state.id);
+    setOrder(next);
+
+    // The card just moved to a different slot, so the finger's offset is now
+    // measured from the wrong origin -- rebase it, otherwise the card lurches
+    // a full slot away from the finger on every swap. Done out here rather
+    // than inside the setOrder updater, which must stay side-effect free.
+    dragState.current.startX = e.clientX;
+    dragState.current.startY = e.clientY;
+    setDragOffset({ x: 0, y: 0 });
   }
 
-  function handlePointerUp(e, cardId) {
+  function endDrag(cardId, { tapAllowed }) {
     const state = dragState.current;
-    const wasTap = state.id === cardId && !state.moved;
+    const wasTap = tapAllowed && state.id === cardId && !state.moved;
     dragState.current = { id: null, startX: 0, startY: 0, moved: false };
     setDraggingId(null);
+    setDragOffset({ x: 0, y: 0 });
+    stopAutoScroll();
     if (wasTap) {
       const cardDisabled = disabled || disabledCardIds.includes(cardId);
       if (!cardDisabled && onToggle) onToggle(cardId);
     }
   }
 
-  function handlePointerCancel() {
-    dragState.current = { id: null, startX: 0, startY: 0, moved: false };
-    setDraggingId(null);
+  function handlePointerUp(cardId) {
+    endDrag(cardId, { tapAllowed: true });
+  }
+
+  useEffect(() => stopAutoScroll, []);
+
+  function handlePointerCancel(cardId) {
+    endDrag(cardId, { tapAllowed: false });
   }
 
   return (
@@ -227,7 +319,7 @@ const Hand = ({ cards, selectedIds = [], onToggle, disabled, sortable, disabledC
           Urutkan
         </StyledSortButton>
       )}
-      <StyledHand>
+      <StyledHand ref={scrollerRef}>
         {orderedCards.map((card, idx) => {
           const cardDisabled = disabled || disabledCardIds.includes(card.id);
           const cardEl = (
@@ -256,11 +348,21 @@ const Hand = ({ cards, selectedIds = [], onToggle, disabled, sortable, disabledC
                 else delete slotRefs.current[card.id];
               }}
               data-card-id={card.id}
-              style={{ zIndex: draggingId === card.id ? 100 : idx }}
+              dragging={draggingId === card.id}
+              style={{
+                zIndex: draggingId === card.id ? 100 : idx,
+                // Follows the finger. Applied to the slot rather than the
+                // card image so PokerCard's own `selected` transform stays
+                // free to do its own thing.
+                transform:
+                  draggingId === card.id
+                    ? `translate(${dragOffset.x}px, ${dragOffset.y - DRAG_LIFT_PX}px)`
+                    : undefined,
+              }}
               onPointerDown={sortable ? (e) => handlePointerDown(e, card.id) : undefined}
               onPointerMove={sortable ? handlePointerMove : undefined}
-              onPointerUp={sortable ? (e) => handlePointerUp(e, card.id) : undefined}
-              onPointerCancel={sortable ? handlePointerCancel : undefined}
+              onPointerUp={sortable ? () => handlePointerUp(card.id) : undefined}
+              onPointerCancel={sortable ? () => handlePointerCancel(card.id) : undefined}
             >
               {cardEl}
             </StyledCardSlot>

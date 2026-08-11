@@ -295,47 +295,22 @@ function closeWithLeftover(table, seatId, cardId) {
   return { type: 'round-ended', result: table.result };
 }
 
-// source: 'deck' (blind draw-and-try-close, own turn) | 'discard' (ceburan --
-// claiming the immediately preceding player's top-of-discard card, own turn)
-// cardId (only used for source 'discard'): the player's chosen tutupan
-// (leftover) card, when more than one valid choice exists. Falls back to
-// auto-picking (findClosablePartition's own preference order) if omitted.
+// source: 'discard' only (ceburan -- claiming the immediately preceding
+// player's top-of-discard card, on your own turn).
+//
+// A 'deck' source used to exist: a blind draw-and-try-close that ended the
+// round automatically if the drawn card happened to complete the hand. It was
+// removed deliberately -- closing should always be a decision the player
+// makes with the card in hand, drawing normally and then picking which card
+// to set aside as the tutupan (see closeWithLeftover).
+//
+// cardId: the player's chosen tutupan (leftover) card, when more than one
+// valid choice exists. Falls back to auto-picking (findClosablePartition's own
+// preference order) if omitted.
 function closeCard(table, seatId, source, cardId) {
   assertPlaying(table);
   const seat = table.seats[seatId];
   if (!seat.cekiAnnounced) throw new GameError('You have not announced Ceki');
-
-  if (source === 'deck') {
-    if (!isPlayersTurn(table, seatId)) throw new GameError('Not your turn');
-    if (seat.hasDrawnThisTurn) throw new GameError('You already drew this turn');
-    if (table.deck.count() === 0) return endDeckEmpty(table);
-
-    const drawn = table.deck.draw();
-    const trialHand = [...seat.hand, drawn];
-
-    const attempt = findClosablePartitionLocal(trialHand);
-    if (!attempt) {
-      // Doesn't actually close -- keep the drawn card, continue turn normally.
-      seat.receiveCard(drawn);
-      seat.hasDrawnThisTurn = true;
-      return { type: 'close-failed', card: drawn };
-    }
-
-    const { leftover, melds } = attempt;
-    seat.hand = melds.flatMap((m) => m.cards);
-    const score =
-      meldsNormalValue(seat.tableMelds) + meldsNormalValue(melds) + cardValue(leftover, 'high');
-
-    table.roundOver = true;
-    table.endReason = 'closed-tutupan';
-    table.result = buildRoundEndResult(table, seatId, score, {
-      method: 'tutupan',
-      tutupanCard: leftover,
-      tableMelds: seat.tableMelds,
-      melds,
-    });
-    return { type: 'round-ended', result: table.result };
-  }
 
   if (source === 'discard') {
     // Kejebur only reaches the immediately-preceding player's discard: that
@@ -402,20 +377,6 @@ function closeCard(table, seatId, source, cardId) {
   throw new GameError('Invalid close source');
 }
 
-// Finds a card to set aside (leftover) such that the rest perfectly
-// partitions into melds. Prefers a natural leftover; a joker is only set
-// aside as the tutupan when no natural card can be.
-function findClosablePartitionLocal(cards) {
-  for (const jokerPass of [false, true]) {
-    for (let i = 0; i < cards.length; i++) {
-      if (cards[i].isJoker !== jokerPass) continue;
-      const rest = cards.slice(0, i).concat(cards.slice(i + 1));
-      const melds = findPerfectPartition(rest);
-      if (melds) return { leftover: cards[i], melds };
-    }
-  }
-  return null;
-}
 
 // --- Scoring ---------------------------------------------------------------
 
@@ -566,10 +527,21 @@ function turnAfterVacating(table, vacatingSeatId) {
 // "salip" (overtake) house rule, and checks for a final game winner against
 // table.targetScore. Call once after a round ends (table.roundOver === true).
 //
-// House rule (user-confirmed, differs from the reference implementation): an
-// overtaken player's score only resets to 0 if their PRIOR score (before
-// being overtaken) was already above SALIP_THRESHOLD -- this avoids trivial
-// resets early in a game when scores are still small.
+// House rule (user-confirmed, differs from the reference implementation): a
+// player who is genuinely overtaken has their score reset to 0, subject to
+// two guards.
+//
+// 1. They must be sitting high both BEFORE and AFTER the round -- above
+//    SALIP_THRESHOLD at each end. Checking only the prior score burned
+//    players who had already collapsed during the round (150 down to 40
+//    still reset), which reads as unfair when the number on screen is well
+//    under the threshold. Requiring both ends also preserves the original
+//    intent: no trivial resets early on while scores are still small.
+//    A negative score can therefore never be reset either -- zeroing it
+//    would hand the "punished" player points back.
+//
+// 2. The overtake must be strict. Drawing level is not passing someone, so
+//    a tie leaves both scores standing.
 function applyRoundResultToScores(table) {
   const result = table.result;
   if (!result || !result.scores) return;
@@ -590,11 +562,12 @@ function applyRoundResultToScores(table) {
       if (a.id === b.id) continue;
       const priorA = priorScores[a.id];
       const priorB = priorScores[b.id];
-      if (
-        priorA < priorB &&
-        rawScores[a.id] >= rawScores[b.id] &&
-        priorB > SALIP_THRESHOLD
-      ) {
+      // Strictly greater: drawing level is not an overtake, so a tie leaves
+      // both scores standing.
+      const overtook = priorA < priorB && rawScores[a.id] > rawScores[b.id];
+      const sittingHigh =
+        priorB > SALIP_THRESHOLD && rawScores[b.id] > SALIP_THRESHOLD;
+      if (overtook && sittingHigh) {
         finalScores[b.id] = 0;
       }
     }

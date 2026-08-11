@@ -17,8 +17,6 @@ const CekiActionBar = ({
   onMeld,
   canCloseLeftover,
   onCloseLeftover,
-  canCloseDeck,
-  onCloseDeck,
   canCloseCeburan,
   onCloseCeburan,
 }) => (
@@ -39,11 +37,6 @@ const CekiActionBar = ({
           🎯
         </span>{' '}
         Tutup!
-      </Button>
-    )}
-    {canCloseDeck && (
-      <Button secondary small onClick={onCloseDeck}>
-        Tutup lewat Deck
       </Button>
     )}
     {canCloseCeburan && (

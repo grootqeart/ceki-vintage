@@ -43,3 +43,14 @@ exports.SEND_STICKER = 'SEND_STICKER';
 exports.STICKER_SENT = 'STICKER_SENT';
 exports.MINIGAME_TAP = 'MINIGAME_TAP';
 exports.MINIGAME_PROGRESS = 'MINIGAME_PROGRESS';
+
+// --- Voice chat (WebRTC signalling) ---------------------------------------
+// The server only brokers the handshake; once peers are connected the audio
+// flows directly between them and never touches this process.
+exports.VOICE_JOIN = 'VOICE_JOIN';
+exports.VOICE_LEAVE = 'VOICE_LEAVE';
+exports.VOICE_PEERS = 'VOICE_PEERS';
+exports.VOICE_PEER_JOINED = 'VOICE_PEER_JOINED';
+exports.VOICE_PEER_LEFT = 'VOICE_PEER_LEFT';
+exports.VOICE_SIGNAL = 'VOICE_SIGNAL';
+exports.VOICE_ROSTER = 'VOICE_ROSTER';

@@ -29,6 +29,11 @@ import { PokerTableWrapper } from '../components/game/PokerTableWrapper';
 import { PositionedUISlot } from '../components/game/PositionedUISlot';
 import { findPerfectPartition, findClosablePartition } from '../pokergame/ceki/combinations';
 import useIsMobile from '../hooks/useIsMobile';
+import useSounds from '../hooks/useSounds';
+import useGameSounds from '../hooks/useGameSounds';
+import SoundToggle from '../components/game/SoundToggle';
+import useVoiceChat from '../hooks/useVoiceChat';
+import VoiceChat from '../components/game/VoiceChat';
 
 const OPPONENT_SLOTS = [
   { top: '-5%', left: '0', origin: 'top left' },
@@ -75,7 +80,7 @@ const Room = () => {
     error,
     clearError,
   } = useContext(roomContext);
-  const { socketId } = useContext(socketContext);
+  const { socket, socketId } = useContext(socketContext);
   const {
     game,
     roundResult,
@@ -86,6 +91,12 @@ const Room = () => {
     closeCard,
   } = useContext(gameContext);
   const isMobile = useIsMobile();
+  const { play: playSound, muted: soundMuted, toggleMuted: toggleSound } = useSounds();
+  // Called here rather than further down beside mySeatId, which is only
+  // computed after this component's early returns -- hooks have to run
+  // unconditionally on every render. `seatId` is the same value.
+  useGameSounds({ game, mySeatId: seatId, play: playSound, error });
+  const voice = useVoiceChat({ socket, code, seatId });
 
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [takeDepth, setTakeDepth] = useState(null);
@@ -296,6 +307,8 @@ const Room = () => {
           })}
         </ul>
         <StickerPicker onSend={sendSticker} />
+        <SoundToggle muted={soundMuted} onToggle={toggleSound} />
+      <VoiceChat {...voice} onJoin={voice.join} onLeave={voice.leave} onToggleMic={voice.toggleMic} />
         {isHost && room.players.length >= 2 && (
           <Button primary onClick={startGame}>
             Mulai Game
@@ -468,6 +481,8 @@ const Room = () => {
         )}
 
         <StickerPicker onSend={sendSticker} />
+        <SoundToggle muted={soundMuted} onToggle={toggleSound} />
+      <VoiceChat {...voice} onJoin={voice.join} onLeave={voice.leave} onToggleMic={voice.toggleMic} />
         <Button secondary small onClick={goToLobby}>
           Keluar
         </Button>
@@ -578,8 +593,6 @@ const Room = () => {
       setSelectedCardId(null);
     }
   };
-
-  const handleCloseDeck = () => closeCard('deck');
 
   // A ceburan can have more than one valid tutupan (leftover) card -- rather
   // than silently auto-picking one for the player, find every hand card that
@@ -974,15 +987,13 @@ const Room = () => {
             isMyTurn && cekiAnnounced && game.hasDrawnThisTurn && selectedCanClose
           }
           onCloseLeftover={handleCloseLeftover}
-          canCloseDeck={
-            isMyTurn && cekiAnnounced && !game.hasDrawnThisTurn && !ceburanCandidateIds
-          }
-          onCloseDeck={handleCloseDeck}
           canCloseCeburan={canCloseCeburan && !ceburanCandidateIds}
           onCloseCeburan={handleCloseCeburan}
         />
       )}
       {!isDealing && <StickerPicker onSend={sendSticker} />}
+      <SoundToggle muted={soundMuted} onToggle={toggleSound} />
+      <VoiceChat {...voice} onJoin={voice.join} onLeave={voice.leave} onToggleMic={voice.toggleMic} />
     </Container>
   );
 };
