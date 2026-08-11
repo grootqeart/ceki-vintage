@@ -40,7 +40,7 @@ const OPPONENT_SLOTS = [
 // corners near the top of the felt rather than a plain side-by-side row, so
 // it reads as seats around a table instead of a stacked list.
 const MOBILE_OPPONENT_SLOTS_BY_COUNT = {
-  1: [{ top: '8%', left: '50%', transform: 'translateX(-50%)', align: 'center' }],
+  1: [{ top: '2%', left: '50%', transform: 'translateX(-50%)', align: 'center' }],
   // These offsets place the CARD STACK -- the name label is floated out of
   // flow (see OpponentPanel) and hangs further out past the table, so it no
   // longer pushes the cards inward. Sitting the stack flush with the table
@@ -51,7 +51,7 @@ const MOBILE_OPPONENT_SLOTS_BY_COUNT = {
   ],
   3: [
     { top: '30%', left: '0%', align: 'left' },
-    { top: '4%', left: '50%', transform: 'translateX(-50%)', align: 'center' },
+    { top: '0%', left: '50%', transform: 'translateX(-50%)', align: 'center' },
     { top: '30%', right: '0%', align: 'right' },
   ],
 };
@@ -695,6 +695,9 @@ const Room = () => {
                 MOBILE_OPPONENT_SLOTS_BY_COUNT[3];
               const slot = slots[idx] || slots[0];
               const activeSticker = latestStickerForSeat(p.seatId);
+              // Only the side seats run vertically -- the top seat spans the
+              // table's width, where a sideways name and a downward card
+              // stack would just waste height.
               return (
                 <div
                   key={p.seatId}
@@ -714,8 +717,9 @@ const Room = () => {
                     ceki={!!(game.ceki && game.ceki[p.seatId])}
                     isLastPlace={p.seatId === room.soleLastPlaceSeatId}
                     flat
-                    vertical
+                    vertical={slot.align !== 'center'}
                     align={slot.align}
+                    compactMelds
                   />
                   {activeSticker && (
                     <StickerBubble key={activeSticker.key} stickerId={activeSticker.stickerId} />

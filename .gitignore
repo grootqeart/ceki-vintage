@@ -27,3 +27,6 @@ loca/~$Loca_Keys_Strings_DE_EN.xlsx
 
 # Claude Code per-machine settings (personal, not shared)
 .claude/settings.local.json
+
+# Ephemeral quick-tunnel hostname, rewritten on every restart
+.tunnel-url

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node ./server/server",
     "build": "node ./scripts/build.js",
+    "tunnel": "node ./scripts/tunnel.js",
     "start:server": "node ./server/server",
     "dev:server": "nodemon ./server/server",
     "start:client": "npm start --prefix client",

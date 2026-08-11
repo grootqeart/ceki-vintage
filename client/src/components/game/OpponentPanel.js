@@ -71,6 +71,17 @@ const StyledHiddenHand = styled.div`
           * ~ * {
             margin-left: -2.75rem;
           }
+
+          /* PokerCard carries a 1rem top margin of its own unless it is
+             given the compact prop, which on the portrait table's top seat
+             reads as a wide gap between the name and the cards and pushes
+             the whole seat further into the felt. Desktop has room for it,
+             so only claw it back for the flat (mobile) panels. */
+          ${({ flat }) =>
+            flat &&
+            css`
+              margin-top: -0.9rem;
+            `}
         `}
 `;
 
@@ -121,6 +132,11 @@ const StyledNameText = styled(Text)`
     `}
 `;
 
+// `vertical`: stack the hidden hand downward and turn the name label on its
+//   side -- for seats along the left/right edges of the portrait table.
+//   The top seat has the table's full width to work with, so it stays
+//   horizontal.
+// `compactMelds`: collapse table melds behind a single card (see MeldTable).
 const OpponentPanel = ({
   player,
   handCount,
@@ -131,6 +147,7 @@ const OpponentPanel = ({
   flat,
   vertical,
   align,
+  compactMelds,
 }) => (
   <StyledPanel isTurn={isTurn} connected={player.connected} flat={flat} align={align}>
     <StyledMain vertical={vertical} reverse={align === 'right'}>
@@ -152,13 +169,17 @@ const OpponentPanel = ({
         </StyledNameText>
         {ceki && <StyledCekiTag>CEKI!</StyledCekiTag>}
       </StyledNameRow>
-      <StyledHiddenHand vertical={vertical}>
+      <StyledHiddenHand vertical={vertical} flat={flat}>
         {Array.from({ length: handCount }).map((_, i) => (
           <PokerCard key={i} card={{}} faceDown width="4vw" maxWidth="45px" minWidth="28px" />
         ))}
       </StyledHiddenHand>
     </StyledMain>
-    <MeldTable melds={melds} />
+    <MeldTable
+      melds={melds}
+      collapsible={compactMelds}
+      side={align === 'right' ? 'right' : 'left'}
+    />
   </StyledPanel>
 );
 
