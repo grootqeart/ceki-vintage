@@ -22,7 +22,7 @@ const ICE_SERVERS = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
-export default function useVoiceChat({ socket, code, seatId }) {
+export default function useVoiceChat({ socket, code, seatId, socketId }) {
   const [joined, setJoined] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [micMuted, setMicMuted] = useState(false);
@@ -170,6 +170,16 @@ export default function useVoiceChat({ socket, code, seatId }) {
 
     const onSignal = async ({ fromSeatId, data }) => {
       if (!joinedRef.current) return;
+
+      // A fresh offer for a peer we already hold means they reconnected and
+      // are calling again. Their old connection is dead on their side, so
+      // answering on top of ours would negotiate against a corpse -- throw it
+      // away and start clean.
+      const held = peersRef.current.get(fromSeatId);
+      if (data.sdp && data.sdp.type === 'offer' && held && held.pc.remoteDescription) {
+        destroyPeer(fromSeatId);
+      }
+
       const pc = createPeer(fromSeatId);
       try {
         if (data.sdp) {
@@ -204,6 +214,24 @@ export default function useVoiceChat({ socket, code, seatId }) {
       socket.off(VOICE_ROSTER, onRoster);
     };
   }, [socket, createPeer, destroyPeer, emit]);
+
+  // Re-announce ourselves after a reconnect. The server drops a disconnected
+  // seat from the voice roster, so without this the call is simply over for
+  // this player until they notice and press the button again -- and the
+  // socket reconnects on its own often enough (backgrounded tab, flaky
+  // mobile data, the tunnel dropping) that it looked like voice "randomly"
+  // died. Keyed on socketId because that is only set once the reconnected
+  // socket has finished re-authenticating with the server.
+  const rejoinKeyRef = useRef(socketId);
+  useEffect(() => {
+    if (rejoinKeyRef.current === socketId) return;
+    rejoinKeyRef.current = socketId;
+    if (!socketId || !joinedRef.current) return;
+
+    // Every peer connection was tied to the old session; none will recover.
+    Array.from(peersRef.current.keys()).forEach(destroyPeer);
+    emit(VOICE_JOIN, {});
+  }, [socketId, destroyPeer, emit]);
 
   // Tear the mic and every peer connection down if the player navigates away
   // while still on the call.

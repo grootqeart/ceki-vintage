@@ -60,6 +60,19 @@ const WebSocketProvider = ({ children }) => {
   }
 
   function registerCallbacks(socket) {
+    // socket.io reconnects on its own after a network blip, a backgrounded
+    // tab, or the tunnel dropping -- but it comes back with a NEW socket id,
+    // and the server keys authenticated players by socket id. Without
+    // re-sending the token here the reconnected socket is a stranger to the
+    // server: every action fails "Not authenticated" and voice chat silently
+    // stays dead, with nothing on screen suggesting a reload is needed.
+    // Fires on the first connect too, which is harmless -- the handler is
+    // idempotent and drops any previous session for the same user.
+    socket.on('connect', () => {
+      const token = localStorage.token;
+      if (token) socket.emit(FETCH_LOBBY_INFO, token);
+    });
+
     socket.on(RECEIVE_LOBBY_INFO, ({ tables, players, socketId }) => {
       console.log(RECEIVE_LOBBY_INFO, tables, players, socketId);
       setSocketId(socketId);

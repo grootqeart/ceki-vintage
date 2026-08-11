@@ -223,7 +223,16 @@ const init = (socket, io) => {
     safe(() => {
       const room = roomManager.getRoom(code);
       if (!room) throw new GameError('Room not found');
+      const player = requirePlayer();
       const seatId = requireSeatId(room);
+
+      // A reconnecting client comes back with a new socket id, and may send
+      // this before it re-sends JOIN_ROOM. Bind the seat to the live socket
+      // here rather than relying on that ordering: otherwise the seat still
+      // points at the dead socket, every peer's offer is relayed into the
+      // void, and the call never comes back. Both calls are idempotent.
+      roomManager.attachSocket(code, player.id, socket.id);
+      socket.join(code);
 
       if (!voiceMembers.has(code)) voiceMembers.set(code, new Set());
       const members = voiceMembers.get(code);

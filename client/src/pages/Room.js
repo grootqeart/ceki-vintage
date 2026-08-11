@@ -96,7 +96,7 @@ const Room = () => {
   // computed after this component's early returns -- hooks have to run
   // unconditionally on every render. `seatId` is the same value.
   useGameSounds({ game, mySeatId: seatId, play: playSound, error });
-  const voice = useVoiceChat({ socket, code, seatId });
+  const voice = useVoiceChat({ socket, code, seatId, socketId });
 
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [takeDepth, setTakeDepth] = useState(null);
@@ -357,6 +357,8 @@ const Room = () => {
         <Text textAlign="center">
           Dia peringkat terakhir, jadi harus kocok kartu dulu sebelum ronde berikutnya dimulai.
         </Text>
+        <SoundToggle muted={soundMuted} onToggle={toggleSound} />
+        <VoiceChat {...voice} onJoin={voice.join} onLeave={voice.leave} onToggleMic={voice.toggleMic} />
         <Button secondary small onClick={goToLobby}>
           Keluar
         </Button>
