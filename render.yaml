@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: ceki-online
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    # Room/game state lives in memory (server/pokergame/RoomManager.js), so a
+    # second instance would have its own separate set of rooms and players
+    # would silently fail to see each other. Must stay at exactly one.
+    numInstances: 1
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      # Set this by hand to the MongoDB Atlas connection string. Leaving it
+      # empty is NOT harmless: server/config/db.js silently falls back to an
+      # in-memory database, so the app boots normally but every account is
+      # wiped on each restart.
+      - key: MONGO_URI
+        sync: false
