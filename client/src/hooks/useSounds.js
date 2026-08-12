@@ -104,6 +104,19 @@ const SYNTH = {
   error: (ctx) => {
     playTone(ctx, { freq: 200, duration: 0.16, gain: 0.11, type: 'square' });
   },
+  // Receives the key it was looked up under so the eight stickers can each
+  // get their own pitch without needing eight entries here. A rising pair of
+  // notes reads as a reaction rather than as another card noise.
+  sticker: (ctx, key) => {
+    const id = parseInt(String(key).replace('sticker', ''), 10);
+    const step = Number.isFinite(id) ? id : 1;
+    // Walks a pentatonic scale, so any two stickers still sound pleasant
+    // back to back.
+    const semitones = [0, 3, 5, 7, 10, 12, 15, 17][(step - 1) % 8];
+    const base = 523.25 * Math.pow(2, semitones / 12);
+    playTone(ctx, { freq: base, duration: 0.12, gain: 0.1, type: 'triangle' });
+    playTone(ctx, { freq: base * 1.5, duration: 0.16, gain: 0.09, type: 'triangle', delay: 0.08 });
+  },
 };
 
 // --- Engine ----------------------------------------------------------------
@@ -155,6 +168,28 @@ function pickSource(key) {
   return chosen;
 }
 
+const FADE_MS = 300;
+
+// Ramps the volume down before pausing. Stopping an element outright mid-clip
+// is audible as a click.
+function fadeOutAndStop(el) {
+  const steps = 10;
+  let n = 0;
+  const from = el.volume;
+  if (el.__fadeTimer) clearInterval(el.__fadeTimer);
+  el.__fadeTimer = setInterval(() => {
+    n += 1;
+    el.volume = Math.max(0, from * (1 - n / steps));
+    if (n >= steps) {
+      clearInterval(el.__fadeTimer);
+      el.__fadeTimer = null;
+      el.pause();
+      el.currentTime = 0;
+      el.volume = 1;
+    }
+  }, FADE_MS / steps);
+}
+
 // One Audio element can't overlap itself -- replaying it restarts the same
 // playback and cuts the previous one off. Each registered file therefore gets
 // a small pool that is cycled through.
@@ -195,13 +230,32 @@ export default function useSounds() {
     };
   }, []);
 
-  const play = useCallback(function playSound(key) {
+  // `keys` may be a single key or a list to try in order -- used so a sticker
+  // can look for its own sound first and fall back to a shared one, e.g.
+  // play(['sticker3', 'sticker']).
+  //
+  // `maxMs` caps how long the clip is allowed to run, fading out rather than
+  // cutting dead so the stop isn't a click. Used for sticker reactions, where
+  // a clip longer than the bubble would keep playing for a sticker that is no
+  // longer on screen.
+  const play = useCallback(function playSound(keys, { maxMs } = {}) {
     if (mutedRef.current) return;
+
+    const candidates = Array.isArray(keys) ? keys : [keys];
+    const key = candidates.find((k) => pickSource(k)) || candidates[candidates.length - 1];
 
     const file = pickSource(key);
     if (file) {
       try {
         const el = getFromPool(key, file);
+        // The pool reuses elements, so undo whatever the previous play left
+        // behind before starting this one.
+        if (el.__stopTimer) clearTimeout(el.__stopTimer);
+        if (el.__fadeTimer) clearInterval(el.__fadeTimer);
+        el.volume = 1;
+        if (maxMs) {
+          el.__stopTimer = setTimeout(() => fadeOutAndStop(el), maxMs);
+        }
         // canPlayType is only ever a guess ('maybe'), so a source can still
         // turn out to be undecodable. Demote the key to synthesis for the
         // rest of the session rather than leaving it permanently silent.
@@ -226,13 +280,17 @@ export default function useSounds() {
       return;
     }
 
-    const synth = SYNTH[key];
+    // Same fallback walk for synthesis: sticker3 has no synth of its own, so
+    // it lands on the shared `sticker` one, which pitches itself from the key
+    // it was asked for.
+    const synthKey = candidates.find((k) => SYNTH[k]);
+    const synth = synthKey && SYNTH[synthKey];
     if (!synth) return;
     try {
       const ctx = getCtx();
       if (!ctx) return;
       if (ctx.state === 'suspended') ctx.resume();
-      synth(ctx);
+      synth(ctx, candidates[0]);
     } catch (e) {
       /* never let audio break the game */
     }

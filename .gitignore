@@ -30,3 +30,6 @@ loca/~$Loca_Keys_Strings_DE_EN.xlsx
 
 # Ephemeral quick-tunnel hostname, rewritten on every restart
 .tunnel-url
+
+# Backups of edited assets
+*.bak

@@ -95,7 +95,7 @@ const Room = () => {
   // Called here rather than further down beside mySeatId, which is only
   // computed after this component's early returns -- hooks have to run
   // unconditionally on every render. `seatId` is the same value.
-  useGameSounds({ game, mySeatId: seatId, play: playSound, error });
+  useGameSounds({ game, mySeatId: seatId, play: playSound, error, stickers });
   const voice = useVoiceChat({ socket, code, seatId, socketId });
 
   const [selectedCardId, setSelectedCardId] = useState(null);

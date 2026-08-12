@@ -20,7 +20,9 @@ import {
 import socketContext from '../websocket/socketContext';
 import RoomContext from './roomContext';
 
-const STICKER_DURATION_MS = 5000;
+// How long a sticker bubble stays on screen. Exported so the sound engine can
+// cut a reaction clip that outlasts its own bubble.
+export const STICKER_DURATION_MS = 5000;
 
 const RoomState = ({ history, children }) => {
   const { socket } = useContext(socketContext);
