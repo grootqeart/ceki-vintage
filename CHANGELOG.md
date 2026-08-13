@@ -1,5 +1,64 @@
 # Changelog
 
+## v1.2.0
+
+Mostly a desktop release: manual card sorting never worked there at all, and
+the seats were laid out wrong. Also fixes a rule bug that could leave a
+finished hand impossible to close.
+
+### Fixed
+
+- **Cards could not be sorted by hand on desktop.** The card slot took a prop
+  named `draggable` — a real HTML attribute, so it was forwarded to the div
+  and turned every card into a native HTML5 drag source. On a mouse the
+  browser's own drag took over on the first movement and fired
+  `pointercancel`, killing the custom reorder before it began. Touch never
+  triggers native drag, which is why only desktop was affected. The prop had
+  only ever been meant to pick a cursor shape.
+
+- **A completed hand could be impossible to close.** Ceki eligibility was
+  computed in exactly one place, inside `discardCard`. Melding cards from the
+  discard pile changes the hand without going through it, so eligibility went
+  stale: the player could not announce Ceki, and since closing requires that
+  announcement, could not close either — even with everything already melded.
+  They had to discard and wait a full turn.
+
+  Eligibility is now recomputed whenever the hand changes, and measured
+  against where in the turn the player is: *one card away* while resting,
+  *closable right now* once they have drawn. An announcement is only
+  withdrawn on the resting hand, so a claim made last turn survives drawing a
+  card that happens not to close.
+
+- **Desktop seats were placed by index, not by player count**, so two
+  opponents took "left" and "middle" instead of sitting across from each
+  other. Now: one opponent goes top, two go left and right, three go left,
+  top and right.
+
+- **The middle seat rendered at full size** beside half-size neighbours and
+  covered the discard pile. It centred itself with an inline
+  `transform: translateX(-50%)`, and an inline transform beats the stylesheet
+  outright — it was silently cancelling the slot's own scale. It now centres
+  with a full-width slot and flexbox, leaving `transform` free for the scale.
+
+- **Slot scaling was dead on wide screens.** Every transform in
+  `PositionedUISlot` lived inside a media query capped at 1068px, so on an
+  ordinary monitor no rule matched and `scale` was ignored entirely — seats
+  rendered at full size straight over the felt.
+
+- **The desktop felt filled the viewport by itself.** It keeps the table
+  image's ~2:1 ratio, so a flat 900px width made it tall enough to push
+  "Melds saya", the hand and the action buttons below the fold, where they
+  read as missing rather than as scrolled past. Its width is now capped
+  against viewport height too.
+
+### Changed
+
+- The player's own melds collapse behind a single badged card on mobile, the
+  way opponents' melds already did. Laid out in full they pushed the hand
+  down the page. Opens upward, since they sit near the bottom of the screen.
+- Desktop side seats sit down on the felt at roughly mid-height instead of
+  hanging above its top edge.
+
 ## v1.1.0
 
 Sound, voice chat, a drag-sort that actually tracks your finger, and a set of
