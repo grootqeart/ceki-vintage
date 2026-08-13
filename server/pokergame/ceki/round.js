@@ -48,6 +48,39 @@ function assertPlaying(table) {
   if (table.roundOver) throw new GameError('Round has already ended');
 }
 
+// True when some card can be set aside so the rest partitions perfectly --
+// i.e. the hand can be closed via tutupan right now. Deliberately mirrors
+// closeWithLeftover's own check rather than reusing findClosablePartition,
+// which refuses to leave a joker over: closing IS allowed to set a joker
+// aside as the tutupan, and a hand only closable that way would otherwise
+// never be reported as eligible.
+function canCloseWithSomeLeftover(hand) {
+  for (let i = 0; i < hand.length; i++) {
+    const rest = hand.slice(0, i).concat(hand.slice(i + 1));
+    if (findPerfectPartition(rest)) return true;
+  }
+  return false;
+}
+
+// Ceki eligibility depends on where in the turn the player is, so it has to
+// be re-evaluated every time their hand changes -- not only when they
+// discard, which is all that used to happen. Taking cards from the discard
+// pile can complete a hand outright, and with stale eligibility the player
+// could not announce Ceki, and therefore could not close, until they had
+// discarded and waited a full turn.
+//
+// `revoke` withdraws an announcement that no longer holds. Only the resting
+// hand (after discarding) may do that: mid-turn a player who legitimately
+// announced last turn still holds their claim even while holding a drawn
+// card that does not happen to close.
+function refreshCekiEligibility(seat, { revoke = false } = {}) {
+  seat.cekiEligible = seat.hasDrawnThisTurn
+    ? canCloseWithSomeLeftover(seat.hand)
+    : isOneCardAwayFromClosed(seat.hand);
+  if (revoke && !seat.cekiEligible) seat.cekiAnnounced = false;
+  return seat.cekiEligible;
+}
+
 function isPlayersTurn(table, seatId) {
   return !table.roundOver && table.turn === seatId;
 }
@@ -99,6 +132,7 @@ function drawFromDeck(table, seatId) {
   const card = table.deck.draw();
   seat.receiveCard(card);
   seat.hasDrawnThisTurn = true;
+  refreshCekiEligibility(seat);
   return { type: 'card-drawn', card, drawPileCount: table.deck.count() };
 }
 
@@ -179,6 +213,7 @@ function meldFromDiscard(table, seatId, count, supportingCardIds) {
   };
   seat.tableMelds.push(meldEntry);
   seat.hasDrawnThisTurn = true;
+  refreshCekiEligibility(seat);
 
   if (meld.type === 'run' || isAceSet) {
     seat.discardMeldUnlocked = true;
@@ -226,9 +261,7 @@ function discardCard(table, seatId, cardId) {
   }
 
   // Recompute Ceki eligibility for the discarding player on their resting hand.
-  const eligible = isOneCardAwayFromClosed(seat.hand);
-  seat.cekiEligible = eligible;
-  if (!eligible) seat.cekiAnnounced = false;
+  const eligible = refreshCekiEligibility(seat, { revoke: true });
 
   advanceTurn(table);
 

@@ -41,10 +41,16 @@ const StyledHand = styled.div`
   padding-right: 0.5rem;
 `;
 
+// `canDrag`, not `draggable`: the latter is a real HTML attribute, and
+// styled-components forwards it straight to the div. That turned every card
+// into a native HTML5 drag source, and on a mouse the browser's own drag
+// takes over on the first move -- it fires pointercancel, which killed the
+// custom reorder before it started. Touch never triggers native drag, so the
+// bug only ever showed on desktop.
 const StyledCardSlot = styled.div`
   touch-action: none;
-  cursor: ${({ draggable, dragging }) =>
-    dragging ? 'grabbing' : draggable ? 'grab' : 'default'};
+  cursor: ${({ canDrag, dragging }) =>
+    dragging ? 'grabbing' : canDrag ? 'grab' : 'default'};
   flex: 0 0 auto;
   position: relative;
 
@@ -342,7 +348,8 @@ const Hand = ({ cards, selectedIds = [], onToggle, disabled, sortable, disabledC
           return (
             <StyledCardSlot
               key={card.id}
-              draggable={sortable}
+              canDrag={sortable}
+              draggable={false}
               ref={(el) => {
                 if (el) slotRefs.current[card.id] = el;
                 else delete slotRefs.current[card.id];

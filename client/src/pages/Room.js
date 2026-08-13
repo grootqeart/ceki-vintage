@@ -35,11 +35,47 @@ import SoundToggle from '../components/game/SoundToggle';
 import useVoiceChat from '../hooks/useVoiceChat';
 import VoiceChat from '../components/game/VoiceChat';
 
-const OPPONENT_SLOTS = [
-  { top: '-5%', left: '0', origin: 'top left' },
-  { top: '-8%', left: '50%', origin: 'top center', style: { transform: 'translateX(-50%)' } },
-  { top: '-5%', right: '0', origin: 'top right' },
-];
+// The felt keeps the table image's ~2:1 ratio, so its height follows the
+// wrapper's width. At a flat 900px it filled a laptop viewport on its own and
+// pushed "Melds saya", the hand, and the action buttons below the fold, where
+// they read as missing rather than as scrolled past. Capping against viewport
+// height as well keeps the rest of the screen on screen. (There is no
+// minHeight for the same reason -- it held the wrapper tall even once the
+// felt itself fitted.)
+const DESKTOP_TABLE_MAX_WIDTH = 'min(900px, 88vh)';
+
+// Desktop seats. They anchor above the felt's top edge and scale downward
+// from that anchor, so the panel's height decides how far onto the table it
+// reaches -- the middle seat sits highest because it is the one the discard
+// pile grows towards.
+//
+// The middle seat is centred with a full-width slot and flexbox rather than
+// `left: 50%` plus a translate. A translate has to live in the element's
+// `style`, and an inline transform beats the stylesheet outright -- it was
+// silently cancelling the slot's own scale, so the middle player rendered at
+// full size next to half-size neighbours and swallowed the discard pile.
+// The side seats sit down on the felt at roughly mid-height, reading as
+// players across the table rather than labels stuck above it. Anchored a
+// little above true centre because a seat's panel grows downward as it
+// collects melds.
+const SEAT_LEFT = { top: '15%', left: '0', origin: 'top left' };
+const SEAT_RIGHT = { top: '15%', right: '0', origin: 'top right' };
+const SEAT_TOP = {
+  top: '-13%',
+  left: '0',
+  width: '100%',
+  origin: 'top center',
+  style: { display: 'flex', justifyContent: 'center' },
+};
+
+// Keyed by how many opponents there are, not by seat index. Indexing a flat
+// list meant two opponents took slots 0 and 1 -- left and middle -- instead
+// of facing each other across the table.
+const OPPONENT_SLOTS_BY_COUNT = {
+  1: [SEAT_TOP],
+  2: [SEAT_LEFT, SEAT_RIGHT],
+  3: [SEAT_LEFT, SEAT_TOP, SEAT_RIGHT],
+};
 
 // Mobile (portrait, rotated-table) opponent positions -- pinned to distinct
 // corners near the top of the felt rather than a plain side-by-side row, so
@@ -655,7 +691,16 @@ const Room = () => {
         <CekiButton eligible={cekiEligible} announced={cekiAnnounced} onAnnounce={announceCeki} />
       )}
 
-      <MeldTable melds={game.tableMelds[mySeatId] || []} label="Melds saya" />
+      {/* Collapsed on the phone, same as the opponents' -- laid out in full
+          it pushes the hand down the page. Opens upward because this sits
+          near the bottom of the screen. Desktop has the room, so it stays
+          expanded there. */}
+      <MeldTable
+        melds={game.tableMelds[mySeatId] || []}
+        label="Melds saya"
+        collapsible={isMobile}
+        placement="up"
+      />
 
       {isDealing && (
         <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
@@ -762,13 +807,15 @@ const Room = () => {
           </div>
         </RotatedFeltTable>
       ) : (
-        <PokerTableWrapper style={{ minHeight: '55vh', maxWidth: '900px' }}>
+        <PokerTableWrapper style={{ maxWidth: DESKTOP_TABLE_MAX_WIDTH }}>
           <PokerTable />
 
           {isDealing && <DealAnimation onComplete={() => setDealPhase(null)} />}
 
           {opponents.map((p, idx) => {
-            const slot = OPPONENT_SLOTS[idx] || OPPONENT_SLOTS[0];
+            const slots =
+              OPPONENT_SLOTS_BY_COUNT[opponents.length] || OPPONENT_SLOTS_BY_COUNT[3];
+            const slot = slots[idx] || slots[0];
             const activeSticker = latestStickerForSeat(p.seatId);
             return (
               <React.Fragment key={p.seatId}>
@@ -776,6 +823,7 @@ const Room = () => {
                   top={slot.top}
                   left={slot.left}
                   right={slot.right}
+                  width={slot.width}
                   scale="0.55"
                   origin={slot.origin}
                   style={slot.style}
@@ -795,7 +843,14 @@ const Room = () => {
                     responsive scale-down. Anchored to the same corner the
                     panel scales toward, so it lands close to the avatar. */}
                 {activeSticker && (
-                  <PositionedUISlot top={slot.top} left={slot.left} right={slot.right} origin={slot.origin}>
+                  <PositionedUISlot
+                    top={slot.top}
+                    left={slot.left}
+                    right={slot.right}
+                    width={slot.width}
+                    origin={slot.origin}
+                    style={slot.style}
+                  >
                     <div style={{ position: 'relative', width: '2rem', height: '2rem' }}>
                       <StickerBubble key={activeSticker.key} stickerId={activeSticker.stickerId} />
                     </div>
@@ -805,10 +860,13 @@ const Room = () => {
             );
           })}
 
+          {/* 0.85 rather than the seats' 0.55: the pile has to stay readable,
+              and shrinking it as hard as the panels would leave the cards
+              barely legible on a wide monitor. */}
           <PositionedUISlot
             width="100%"
             origin="center center"
-            scale="0.7"
+            scale="0.85"
             style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
           >
             <TableCenter

@@ -61,7 +61,9 @@ const StyledCount = styled.span`
 const StyledPopover = styled.div`
   position: absolute;
   z-index: 60;
-  top: 0;
+  /* Opens upward for the player's own melds, which sit near the bottom of
+     the page -- downward would run straight off the screen. */
+  ${({ placement }) => (placement === 'up' ? 'bottom: 0;' : 'top: 0;')}
   ${({ side }) => (side === 'right' ? 'right: 0;' : 'left: 0;')}
   background-color: rgba(20, 40, 35, 0.94);
   border-radius: 10px;
@@ -72,6 +74,20 @@ const StyledPopover = styled.div`
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
   width: max-content;
   max-width: 60vw;
+`;
+
+const StyledCollapsedWrap = styled.div`
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+`;
+
+const StyledCollapsedLabel = styled.span`
+  font-size: 0.6rem;
+  opacity: 0.75;
+  line-height: 1;
+  white-space: nowrap;
 `;
 
 const StyledPopoverHeader = styled.button`
@@ -90,10 +106,13 @@ const FULL_CARD = { width: '4vw', maxWidth: '45px', minWidth: '28px' };
 
 // Renders a player's melds (cards taken from the discard pile and laid
 // face-up on the table). `melds`: [{ id, cards, meld }].
-// `collapsible` shows just one card until tapped -- used for opponent seats
-// on the portrait table, where space beside the felt is very tight.
-// `side` picks which edge an opened popover is anchored to.
-const MeldTable = ({ melds, label, collapsible, side }) => {
+// `collapsible` shows just one card until tapped -- used on the portrait
+// table for opponent seats, where space beside the felt is very tight, and
+// for the player's own melds, which would otherwise push the hand further
+// down the page.
+// `side` picks which edge an opened popover is anchored to, `placement`
+// whether it opens up or down.
+const MeldTable = ({ melds, label, collapsible, side, placement }) => {
   const [open, setOpen] = useState(false);
 
   if (!melds || melds.length === 0) return null;
@@ -112,30 +131,34 @@ const MeldTable = ({ melds, label, collapsible, side }) => {
 
     if (!open) {
       return (
-        <StyledCollapsedButton
-          type="button"
-          onClick={() => setOpen(true)}
-          title={`Lihat ${totalCards} kartu meld`}
-          aria-label={`Lihat ${totalCards} kartu meld`}
-        >
-          <PokerCard card={melds[0].cards[0]} {...cardSize} compact />
-          <StyledCount>{totalCards}</StyledCount>
-        </StyledCollapsedButton>
+        <StyledCollapsedWrap>
+          {label && <StyledCollapsedLabel>{label}</StyledCollapsedLabel>}
+          <StyledCollapsedButton
+            type="button"
+            onClick={() => setOpen(true)}
+            title={`Lihat ${totalCards} kartu meld`}
+            aria-label={`Lihat ${totalCards} kartu meld`}
+          >
+            <PokerCard card={melds[0].cards[0]} {...cardSize} compact />
+            <StyledCount>{totalCards}</StyledCount>
+          </StyledCollapsedButton>
+        </StyledCollapsedWrap>
       );
     }
 
     return (
-      <div style={{ position: 'relative' }}>
-        {/* Keeps the collapsed card in the layout so the seat doesn't shift
-            as the popover opens and closes. */}
+      <StyledCollapsedWrap style={{ position: 'relative' }}>
+        {label && <StyledCollapsedLabel>{label}</StyledCollapsedLabel>}
+        {/* Keeps the collapsed card in the layout so nothing shifts as the
+            popover opens and closes. */}
         <PokerCard card={melds[0].cards[0]} {...cardSize} compact />
-        <StyledPopover side={side}>
+        <StyledPopover side={side} placement={placement}>
           <StyledPopoverHeader type="button" onClick={() => setOpen(false)}>
             Tutup &times;
           </StyledPopoverHeader>
           {rows}
         </StyledPopover>
-      </div>
+      </StyledCollapsedWrap>
     );
   }
 

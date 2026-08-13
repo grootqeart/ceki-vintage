@@ -12,6 +12,14 @@ export const PositionedUISlot = styled.div`
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 
+  /* Every transform below lives inside a media query capped at 1068px, so on
+     anything wider -- i.e. an ordinary desktop monitor -- no rule matched and
+     the scale prop was silently ignored: slots rendered at full size and the
+     seats grew straight over the felt and the discard pile. This base rule
+     makes the prop mean something at every width; the queries still override
+     it as the window narrows. */
+  transform: ${({ scale }) => (scale ? `scale(${scale})` : 'none')};
+
   @media screen and (max-width: 1068px) {
     transform: ${({ scale }) => `scale(${+scale + 0.3})` || '1'};
   }
