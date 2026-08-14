@@ -1,5 +1,53 @@
 # Changelog
 
+## v1.3.0
+
+Seating that matches the order play actually goes in, opponent card counts,
+and a tidier bottom of the screen.
+
+### Fixed
+
+- **Every player saw a different, mostly wrong, seating.** The server takes
+  turns in ascending seat id and wraps around; the client filtered itself out
+  of that list, which keeps the ascending order but drops the rotation. Only
+  whoever held the lowest seat ever saw an arrangement matching play — at
+  seat 3 of 4 the player due to go next was drawn on the far side of the
+  table from the two who follow them.
+
+  The list is now rotated to start with whoever plays straight after you, so
+  each player sees the table from their own chair. The slots run left → top →
+  right, which is clockwise from the bottom where you sit, so play visibly
+  travels clockwise for everyone.
+
+  Verified every viewpoint at 2, 3 and 4 players against the order the server
+  actually takes turns in — 9 of 9 match.
+
+### Added
+
+- **Card counts on opponents' hands.** The cards are stacked nearly on top of
+  each other, so counting them by eye is guesswork past three or four — and
+  how close an opponent is to going out is the main thing a seat gets read
+  for.
+
+### Changed
+
+- **Your own melds moved beside your avatar** and collapse behind a single
+  badged card on both desktop and mobile. Laid out in full they occupied a
+  whole band of height, which is what pushed the action buttons so far down
+  the page.
+
+### Notes
+
+Closing with a joker was checked and already works, in all three forms: as
+the tutupan on a normal close, as the tutupan on a ceburan, and standing in
+for a missing card inside a meld. A joker set aside as the tutupan is worth
+100. A discarded joker still leaves the game outright, so one can never be
+taken back off the discard pile.
+
+A comment on `findClosablePartition` claimed the opposite — that a joker can
+never be the tutupan. The code has always preferred a natural card but fallen
+back to a joker; the comment was simply wrong, in both copies, and is fixed.
+
 ## v1.2.0
 
 Mostly a desktop release: manual card sorting never worked there at all, and
