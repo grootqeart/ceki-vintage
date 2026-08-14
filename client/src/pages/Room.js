@@ -543,7 +543,24 @@ const Room = () => {
 
   const myHand = game.myHand || [];
   const me = room.players.find((p) => p.seatId === mySeatId);
-  const opponents = room.players.filter((p) => p.seatId !== mySeatId);
+  // Opponents in turn order, starting with whoever plays straight after me.
+  //
+  // The server takes turns in ascending seat id, wrapping around. Simply
+  // filtering yourself out of that list keeps the ascending order but not the
+  // rotation, so the arrangement only matched the turn order for whoever held
+  // the lowest seat: at seat 3 of 4 the player after you (seat 4) was drawn
+  // on the far side of the table from the two who play after them. Every
+  // player saw a different, and mostly wrong, seating.
+  //
+  // Rotating here makes each player see the table from their own chair, and
+  // since the slot lists below run left -> top -> right -- clockwise from the
+  // bottom, where you sit -- play visibly travels clockwise for everyone.
+  const seatOrder = [...room.players].sort((a, b) => a.seatId - b.seatId);
+  const myIndex = seatOrder.findIndex((p) => p.seatId === mySeatId);
+  const opponents =
+    myIndex === -1
+      ? seatOrder
+      : [...seatOrder.slice(myIndex + 1), ...seatOrder.slice(0, myIndex)];
   const isMyTurn = game.turnSeatId === mySeatId;
   const isDealing = dealPhase === 'animating';
 
@@ -690,17 +707,6 @@ const Room = () => {
       {!isDealing && (
         <CekiButton eligible={cekiEligible} announced={cekiAnnounced} onAnnounce={announceCeki} />
       )}
-
-      {/* Collapsed on the phone, same as the opponents' -- laid out in full
-          it pushes the hand down the page. Opens upward because this sits
-          near the bottom of the screen. Desktop has the room, so it stays
-          expanded there. */}
-      <MeldTable
-        melds={game.tableMelds[mySeatId] || []}
-        label="Melds saya"
-        collapsible={isMobile}
-        placement="up"
-      />
 
       {isDealing && (
         <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
@@ -966,6 +972,17 @@ const Room = () => {
                 })()}
               </div>
             )}
+            {/* Beside the avatar rather than on its own row: laid out in full
+                below the table it added a whole band of height, pushing the
+                action buttons down the page on both layouts. Collapsed here
+                it costs one card's width. Opens upward -- this sits near the
+                bottom of the screen. */}
+            <MeldTable
+              melds={game.tableMelds[mySeatId] || []}
+              label="Melds"
+              collapsible
+              placement="up"
+            />
             <Text textAlign="center" style={{ marginBottom: 0 }}>
               Tangan saya:
               {cekiAnnounced && (

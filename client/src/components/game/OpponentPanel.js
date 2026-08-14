@@ -54,6 +54,35 @@ const StyledTurnDot = styled.span`
   flex-shrink: 0;
 `;
 
+// Wraps the stack so the count badge can sit on it without being caught by
+// StyledHiddenHand's `* ~ *` overlap rule, which would shove it under the
+// cards along with them.
+const StyledHandWrap = styled.div`
+  position: relative;
+  display: inline-flex;
+`;
+
+// The cards are stacked almost on top of each other, so counting them by eye
+// is guesswork past three or four -- which matters, since how close an
+// opponent is to going out is the main thing you read off their seat.
+const StyledHandCount = styled.span`
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background-color: rgba(20, 40, 35, 0.9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+`;
+
 const StyledHiddenHand = styled.div`
   display: flex;
 
@@ -169,11 +198,16 @@ const OpponentPanel = ({
         </StyledNameText>
         {ceki && <StyledCekiTag>CEKI!</StyledCekiTag>}
       </StyledNameRow>
-      <StyledHiddenHand vertical={vertical} flat={flat}>
-        {Array.from({ length: handCount }).map((_, i) => (
-          <PokerCard key={i} card={{}} faceDown width="4vw" maxWidth="45px" minWidth="28px" />
-        ))}
-      </StyledHiddenHand>
+      <StyledHandWrap>
+        <StyledHiddenHand vertical={vertical} flat={flat}>
+          {Array.from({ length: handCount }).map((_, i) => (
+            <PokerCard key={i} card={{}} faceDown width="4vw" maxWidth="45px" minWidth="28px" />
+          ))}
+        </StyledHiddenHand>
+        {handCount > 0 && (
+          <StyledHandCount title={`${handCount} kartu di tangan`}>{handCount}</StyledHandCount>
+        )}
+      </StyledHandWrap>
     </StyledMain>
     <MeldTable
       melds={melds}

@@ -256,9 +256,11 @@ function isOneCardAwayFromClosed(hand) {
 }
 
 // Given a hand (e.g. 8 cards after drawing/taking the needed card), finds a
-// single non-joker card to set aside (the tutupan, discarded) such that the
-// remaining cards form a perfect meld partition. Returns { leftover, melds }
-// or null. Jokers can never be the leftover (they can't be discarded).
+// single card to set aside (the tutupan, discarded) such that the remaining
+// cards form a perfect meld partition. Returns { leftover, melds } or null.
+// A natural card is preferred, but a joker CAN be the leftover -- see the
+// loop below. (An earlier version of this comment claimed otherwise, which
+// never matched the code.)
 //
 // excludeLeftoverId: if given, that card may NOT be the leftover -- used to
 // require that a specific card (e.g. one just taken from the discard pile for
