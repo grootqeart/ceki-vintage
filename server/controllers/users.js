@@ -19,18 +19,32 @@ exports.register = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
-    let user =
-      (await User.findOne({ email })) || (await User.findOne({ name }));
-
-    if (user) {
+    // Both are unique, and the old code answered "Invalid credentials" for
+    // either -- which reads as "wrong password" on a registration form and
+    // told the player nothing about what to change. Signing in with Google
+    // creates an account too, so hitting this by registering with an address
+    // already used that way is easy.
+    //
+    // This does confirm whether an address is registered. For a game played
+    // among friends, a player who cannot tell why the form keeps failing is
+    // the worse problem.
+    if (await User.findOne({ email })) {
       return res.status(400).json({
         errors: [
           {
-            msg: 'Invalid credentials',
+            msg: 'Email ini sudah terdaftar. Coba login, atau masuk dengan Google.',
           },
         ],
       });
     }
+
+    if (await User.findOne({ name })) {
+      return res.status(400).json({
+        errors: [{ msg: 'Nickname ini sudah dipakai. Pilih yang lain.' }],
+      });
+    }
+
+    let user;
 
     user = new User({ name, email, password });
 

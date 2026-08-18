@@ -3,6 +3,20 @@ import Axios from 'axios';
 import setAuthToken from '../helpers/setAuthToken';
 import globalContext from '../context/global/globalContext';
 
+// The server explains exactly what went wrong -- "Email ini sudah terdaftar",
+// "Password minimal 6 karakter" -- but axios only ever stringifies to
+// "Request failed with status code 400", which is what players were being
+// shown. Dig the real message out, and keep the generic one only as a last
+// resort.
+function serverMessage(error, fallback) {
+  const data = error && error.response && error.response.data;
+  if (data && Array.isArray(data.errors) && data.errors.length) {
+    return data.errors.map((e) => e.msg).join('\n');
+  }
+  if (data && data.msg) return data.msg;
+  return fallback;
+}
+
 const useAuth = () => {
   localStorage.token && setAuthToken(localStorage.token);
 
@@ -43,7 +57,7 @@ const useAuth = () => {
         await loadUser(token);
       }
     } catch (error) {
-      alert(error);
+      alert(serverMessage(error, 'Pendaftaran gagal. Coba lagi.'));
     }
     setIsLoading(false);
   };
@@ -64,7 +78,7 @@ const useAuth = () => {
         await loadUser(token);
       }
     } catch (error) {
-      alert(error);
+      alert(serverMessage(error, 'Email atau password salah.'));
     }
     setIsLoading(false);
   };
@@ -85,13 +99,7 @@ const useAuth = () => {
         await loadUser(token);
       }
     } catch (error) {
-      const msg =
-        (error.response &&
-          error.response.data &&
-          error.response.data.errors &&
-          error.response.data.errors[0].msg) ||
-        'Login Google gagal';
-      alert(msg);
+      alert(serverMessage(error, 'Login Google gagal'));
     }
     setIsLoading(false);
   };
@@ -112,8 +120,11 @@ const useAuth = () => {
       setEmail(email);
       setChipsAmount(chipsAmount);
     } catch (error) {
-      localStorage.removeItem(token);
-      alert(error);
+      // Was removeItem(token) -- passing the token's *value* as the key, so
+      // the bad token was never actually cleared and every reload retried it.
+      localStorage.removeItem('token');
+      setAuthToken(null);
+      alert(serverMessage(error, 'Sesi berakhir, silakan masuk lagi.'));
     }
   };
 
