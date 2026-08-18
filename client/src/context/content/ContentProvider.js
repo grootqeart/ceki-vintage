@@ -34,6 +34,9 @@ const ContentProvider = ({ children }) => {
   }, [lang]);
 
   const fetchContent = () => {
+    // No space configured: the local snapshot set above is all there is.
+    if (!contentfulClient) return;
+
     contentfulClient
       .getEntries({ content_type: 'key', locale: lang })
       .then((res) => {
