@@ -6,10 +6,13 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm start
-    # Room/game state lives in memory (server/pokergame/RoomManager.js), so a
-    # second instance would have its own separate set of rooms and players
-    # would silently fail to see each other. Must stay at exactly one.
-    numInstances: 1
+    # NOTE: room/game state lives in memory (server/pokergame/RoomManager.js),
+    # so this service must never run more than one instance -- a second one
+    # would hold its own separate set of rooms and players would silently fail
+    # to see each other. Not pinned with `numInstances` here because scaling
+    # is a paid feature and the key is rejected on the free plan, which would
+    # fail the whole blueprint. The free plan is single-instance anyway; if
+    # this service is ever upgraded, keep scaling at 1.
     healthCheckPath: /
     envVars:
       - key: NODE_ENV
