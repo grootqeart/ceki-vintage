@@ -69,6 +69,33 @@ const useAuth = () => {
     setIsLoading(false);
   };
 
+  // `credential` is the ID token Google's button hands back. The server
+  // verifies it and returns our own JWT, so from here on this is
+  // indistinguishable from a password login.
+  const loginWithGoogle = async (credential) => {
+    setIsLoading(true);
+    try {
+      const res = await Axios.post('/api/auth/google', { credential });
+
+      const token = res.data.token;
+
+      if (token) {
+        localStorage.setItem('token', token);
+        setAuthToken(token);
+        await loadUser(token);
+      }
+    } catch (error) {
+      const msg =
+        (error.response &&
+          error.response.data &&
+          error.response.data.errors &&
+          error.response.data.errors[0].msg) ||
+        'Login Google gagal';
+      alert(msg);
+    }
+    setIsLoading(false);
+  };
+
   const loadUser = async (token) => {
     try {
       const res = await Axios.get('/api/auth', {
@@ -99,7 +126,7 @@ const useAuth = () => {
     setChipsAmount(null);
   };
 
-  return [isLoggedIn, login, logout, register, loadUser];
+  return [isLoggedIn, login, logout, register, loadUser, loginWithGoogle];
 };
 
 export default useAuth;

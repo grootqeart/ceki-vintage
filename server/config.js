@@ -8,6 +8,10 @@ if (process.env.NODE_ENV !== 'production') {
 module.exports = {
   PORT: process.env.PORT || 5000,
   JWT_SECRET: process.env.JWT_SECRET,
+  // Public value -- it appears in the page source of any site using Google
+  // sign-in. Needed on the server too, as the audience the ID token must
+  // have been issued for.
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   MONGO_URI: process.env.MONGO_URI,
   NODE_ENV: process.env.NODE_ENV,
   INITIAL_CHIPS_AMOUNT: 30000,

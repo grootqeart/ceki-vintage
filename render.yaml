@@ -25,3 +25,14 @@ services:
       # wiped on each restart.
       - key: MONGO_URI
         sync: false
+      # Google sign-in. The client id is public by nature -- it is visible in
+      # the page source of every site that offers Google sign-in -- so it is
+      # committed rather than kept out of the repo. There is no client secret
+      # here: this flow verifies the ID token Google hands the browser, which
+      # needs only the id. Both copies must match; the browser one is baked
+      # into the bundle at build time, the server one is the audience the
+      # token has to have been issued for.
+      - key: GOOGLE_CLIENT_ID
+        value: 706018926108-r3uib4sqkqfu23pr1fon5dc7q8b4ps1s.apps.googleusercontent.com
+      - key: REACT_APP_GOOGLE_CLIENT_ID
+        value: 706018926108-r3uib4sqkqfu23pr1fon5dc7q8b4ps1s.apps.googleusercontent.com

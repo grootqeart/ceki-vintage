@@ -1,5 +1,6 @@
 import React, { useRef, useContext } from 'react';
 import Container from '../components/layout/Container';
+import GoogleSignInButton from '../components/user/GoogleSignInButton';
 import { Redirect, Link } from 'react-router-dom';
 import HeadingWithLogo from '../components/typography/HeadingWithLogo';
 import Button from '../components/buttons/Button';
@@ -87,6 +88,7 @@ const LoginPage = () => {
             </Link>
           </ButtonGroup>
         </Form>
+        <GoogleSignInButton text="signin_with" />
       </Container>
     </RelativeWrapper>
   );
