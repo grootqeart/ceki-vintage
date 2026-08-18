@@ -101,8 +101,8 @@ const RoomState = ({ history, children }) => {
     // eslint-disable-next-line
   }, [socket]);
 
-  const createRoom = (maxPlayers, targetScore) => {
-    socket && socket.emit(CREATE_ROOM, { maxPlayers, targetScore });
+  const createRoom = (maxPlayers, targetScore, name) => {
+    socket && socket.emit(CREATE_ROOM, { maxPlayers, targetScore, name });
   };
 
   const joinRoom = (joinCode) => {

@@ -95,13 +95,14 @@ const init = (socket, io) => {
     }
   });
 
-  socket.on(CREATE_ROOM, ({ maxPlayers, targetScore }) => {
+  socket.on(CREATE_ROOM, ({ maxPlayers, targetScore, name }) => {
     safe(() => {
       const player = requirePlayer();
       const { room, seatId } = roomManager.createRoom({
         hostPlayer: player,
         maxPlayers,
         targetScore,
+        name,
       });
       socket.join(room.code);
       socket.emit(ROOM_CREATED, {

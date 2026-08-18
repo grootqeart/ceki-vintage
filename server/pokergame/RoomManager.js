@@ -6,6 +6,7 @@ const {
   MAX_PLAYERS,
   VALID_TARGET_SCORES,
   ROOM_CODE_LENGTH,
+  ROOM_NAME_MAX_LENGTH,
 } = require('./ceki/constants');
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
@@ -36,7 +37,7 @@ class RoomManager {
 
   // `hostPlayer` is an already-authenticated Player instance (see
   // server/pokergame/Player.js), built from the FETCH_LOBBY_INFO flow.
-  createRoom({ hostPlayer, maxPlayers, targetScore }) {
+  createRoom({ hostPlayer, maxPlayers, targetScore, name }) {
     if (!hostPlayer) throw new GameError('Not authenticated');
     if (!MAX_PLAYERS_RANGE.includes(maxPlayers)) {
       throw new GameError('Invalid player count');
@@ -44,6 +45,20 @@ class RoomManager {
     if (!VALID_TARGET_SCORES.includes(targetScore)) {
       throw new GameError('Invalid target score');
     }
+
+    // A name is what people scan the lobby for, so it is trimmed, capped, and
+    // stripped of control characters before anyone else ever sees it. Falling
+    // back to the host's own name keeps every room findable even when the
+    // field is left blank.
+    const roomName =
+      String(name || '')
+        // Control characters would wreck the lobby layout. Escaped rather
+        // than left as the literal bytes they replaced, which an editor
+        // shows as nothing at all.
+        .replace(/[\u0000-\u001f\u007f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, ROOM_NAME_MAX_LENGTH) || `Room ${hostPlayer.name}`;
 
     let code;
     do {
@@ -56,6 +71,7 @@ class RoomManager {
 
     const room = {
       code,
+      name: roomName,
       maxPlayers,
       targetScore,
       table,
@@ -165,6 +181,31 @@ class RoomManager {
 
   getRoom(code) {
     return this.rooms.get(code) || null;
+  }
+
+  // Rooms anyone can still walk into, for the lobby list. Only 'waiting'
+  // rooms qualify -- joinRoom refuses anything else, so listing a room in
+  // progress would just be an invitation to be rejected. Carries no hand or
+  // seat data; the lobby only needs enough to pick one.
+  listOpenRooms() {
+    const open = [];
+    for (const room of this.rooms.values()) {
+      if (room.status !== 'waiting') continue;
+      const playerCount = room.table.activeSeats().length;
+      if (playerCount >= room.maxPlayers) continue;
+      const host = room.table.seats[room.hostSeatId];
+      open.push({
+        code: room.code,
+        name: room.name,
+        playerCount,
+        maxPlayers: room.maxPlayers,
+        targetScore: room.targetScore,
+        hostName: host ? host.player.name : null,
+      });
+    }
+    // Fullest first: a room one player short of starting is the most useful
+    // one to join.
+    return open.sort((a, b) => b.playerCount - a.playerCount);
   }
 
   getRoomBySocket(socketId) {
@@ -291,6 +332,7 @@ class RoomManager {
 
     return {
       code: room.code,
+      name: room.name,
       maxPlayers: room.maxPlayers,
       targetScore: room.targetScore,
       status: room.status,

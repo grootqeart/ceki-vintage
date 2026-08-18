@@ -36,6 +36,7 @@ const MAX_DISCARD_TAKE = 7;
 // do not count towards it.
 const MIN_SUPPORT_FROM_HAND = 2;
 const ROOM_CODE_LENGTH = 6;
+const ROOM_NAME_MAX_LENGTH = 30;
 const VALID_TARGET_SCORES = [500, 1000];
 
 // Tarif normal (in-hand / end-of-deck scoring)
@@ -82,6 +83,7 @@ module.exports = {
   MAX_DISCARD_TAKE,
   MIN_SUPPORT_FROM_HAND,
   ROOM_CODE_LENGTH,
+  ROOM_NAME_MAX_LENGTH,
   VALID_TARGET_SCORES,
   NORMAL_VALUES,
   HIGH_VALUES,

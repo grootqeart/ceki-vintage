@@ -37,6 +37,7 @@ export const MAX_DISCARD_TAKE = 7;
 // do not count towards it.
 export const MIN_SUPPORT_FROM_HAND = 2;
 export const ROOM_CODE_LENGTH = 6;
+export const ROOM_NAME_MAX_LENGTH = 30;
 export const VALID_TARGET_SCORES = [500, 1000];
 
 // Tarif normal (in-hand / end-of-deck scoring)

@@ -308,7 +308,7 @@ const Room = () => {
       >
         {errorToast}
         <Heading as="h2" textCentered>
-          Room {room.code}
+          {room.name || `Room ${room.code}`}
         </Heading>
         <Text textAlign="center">
           Bagikan kode ini ke teman: <strong>{room.code}</strong>
