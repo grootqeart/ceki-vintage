@@ -12,7 +12,12 @@ const {
   bestMeldedSubset,
   isOneCardAwayFromClosed,
 } = require('./combinations');
-const { MAX_DISCARD_TAKE, SALIP_THRESHOLD, JOKER_PENALTY } = require('./constants');
+const {
+  MAX_DISCARD_TAKE,
+  MIN_SUPPORT_FROM_HAND,
+  SALIP_THRESHOLD,
+  JOKER_PENALTY,
+} = require('./constants');
 const { GameError } = require('./errors');
 
 function activeSeats(table) {
@@ -191,6 +196,16 @@ function meldFromDiscard(table, seatId, count, supportingCardIds) {
 
   const usedFromHand = supportingCards.filter((c) => hand.includes(c));
   const usedFromPile = new Set(supportingCards.filter((c) => pilePool.includes(c)));
+
+  // The two supporting cards must be YOUR OWN. Counting supportingCardIds
+  // alone was not enough: those may be drawn from the pile pool too, so a
+  // take could be propped up by one hand card and a card swept along with the
+  // needed one -- or by none of your own at all.
+  if (usedFromHand.length < MIN_SUPPORT_FROM_HAND) {
+    throw new GameError(
+      `Ambilan dari buangan harus didukung minimal ${MIN_SUPPORT_FROM_HAND} kartu dari tanganmu sendiri`,
+    );
+  }
   const unusedPileExtras = pilePool.filter((c) => !usedFromPile.has(c));
 
   const resultingHandSize = hand.length - usedFromHand.length + unusedPileExtras.length;

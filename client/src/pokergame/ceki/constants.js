@@ -32,6 +32,10 @@ export const HAND_SIZE = 7;
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
 export const MAX_DISCARD_TAKE = 7;
+// Taking from the discard pile has to be supported by at least this many
+// cards from the player's OWN hand -- cards swept up alongside the needed one
+// do not count towards it.
+export const MIN_SUPPORT_FROM_HAND = 2;
 export const ROOM_CODE_LENGTH = 6;
 export const VALID_TARGET_SCORES = [500, 1000];
 

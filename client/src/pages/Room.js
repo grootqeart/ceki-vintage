@@ -28,6 +28,7 @@ import PokerTable from '../components/game/PokerTable';
 import { PokerTableWrapper } from '../components/game/PokerTableWrapper';
 import { PositionedUISlot } from '../components/game/PositionedUISlot';
 import { findPerfectPartition, findClosablePartition } from '../pokergame/ceki/combinations';
+import { MIN_SUPPORT_FROM_HAND } from '../pokergame/ceki/constants';
 import useIsMobile from '../hooks/useIsMobile';
 import useSounds from '../hooks/useSounds';
 import useGameSounds from '../hooks/useGameSounds';
@@ -542,6 +543,14 @@ const Room = () => {
   }
 
   const myHand = game.myHand || [];
+  // Only cards from your own hand count towards the take's support -- cards
+  // swept up alongside the needed one can be selected too, but they do not
+  // satisfy the requirement. Counting the whole selection let the button
+  // light up on a take the server then refused.
+  const supportFromHandCount = supportSelection.filter((id) =>
+    myHand.some((c) => c.id === id),
+  ).length;
+  const hasEnoughSupport = supportFromHandCount >= MIN_SUPPORT_FROM_HAND;
   const me = room.players.find((p) => p.seatId === mySeatId);
   // Opponents in turn order, starting with whoever plays straight after me.
   //
@@ -624,7 +633,7 @@ const Room = () => {
   };
 
   const handleMeld = () => {
-    if (takeDepth && supportSelection.length >= 2) {
+    if (takeDepth && hasEnoughSupport) {
       meldFromDiscard(takeDepth, supportSelection);
       setTakeDepth(null);
       setSupportSelection([]);
@@ -936,8 +945,9 @@ const Room = () => {
       ) : takeDepth ? (
         <div style={{ textAlign: 'center', margin: '0.5rem 0' }}>
           <Text textAlign="center">
-            Pilih minimal 2 kartu pendukung dari tanganmu (kartu ikut terambil bisa dipilih
-            langsung di tumpukan buangan di atas):
+            Pilih minimal {MIN_SUPPORT_FROM_HAND} kartu pendukung dari tanganmu sendiri
+            (terpilih: {supportFromHandCount}). Kartu yang ikut terambil boleh dipilih juga
+            di tumpukan buangan di atas, tapi tidak dihitung sebagai pendukung:
           </Text>
           {!discardUnlocked && (
             <Text textAlign="center" style={{ color: '#b8860b', fontSize: '0.75rem' }}>
@@ -1057,7 +1067,7 @@ const Room = () => {
           canDiscard={isMyTurn && game.hasDrawnThisTurn && !!selectedCardId}
           onDiscard={handleDiscard}
           canMeld={
-            isMyTurn && !game.hasDrawnThisTurn && !!takeDepth && supportSelection.length >= 2
+            isMyTurn && !game.hasDrawnThisTurn && !!takeDepth && hasEnoughSupport
           }
           onMeld={handleMeld}
           canCloseLeftover={
