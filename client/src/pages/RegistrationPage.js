@@ -108,20 +108,6 @@ const RegistrationPage = () => {
             </Link>
           </ButtonGroup>
         </Form>
-        {/* Temporary while testing -- skips typing name/email/password every
-            time by registering a fresh throwaway guest account in one tap. */}
-        <Button
-          secondary
-          type="button"
-          fullWidth
-          style={{ marginTop: '1rem' }}
-          onClick={() => {
-            const suffix = Math.floor(1000 + Math.random() * 9000);
-            register(`Tamu${suffix}`, `tamu${suffix}@ceki.local`, 'tamu123');
-          }}
-        >
-          Main sebagai Tamu
-        </Button>
       </Container>
     </RelativeWrapper>
   );
