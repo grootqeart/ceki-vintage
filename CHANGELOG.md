@@ -1,5 +1,102 @@
 # Changelog
 
+## v1.4.0
+
+Google sign-in, a searchable lobby, deploy fixes, and a `npm run dev` crash
+that hit every Node 18 machine.
+
+### Added
+
+- **Google sign-in**, alongside the existing email/password login. The
+  browser gets an ID token from Google's own button; the server verifies its
+  signature and audience against Google and issues the same JWT the password
+  login does, so sockets, reconnect and the game itself neither know nor care
+  how a user signed in.
+
+  Accounts are matched on the Google subject id first, the email second, so
+  someone who already registered with a password lands on their existing
+  account instead of a duplicate. A colliding display name gets a number
+  appended rather than failing with a database error.
+
+  The client id is committed in both configs rather than left to an
+  environment variable — it is public by nature, visible in the page source
+  of any site offering Google sign-in, and this flow carries no client
+  secret. The first deploy actually broke on exactly this: the server-side
+  copy of the variable never reached the Render runtime for reasons that
+  stayed unexplained, taking sign-in down with a message no player could act
+  on. Committing it removes that failure mode outright.
+
+- **A searchable room lobby.** Rooms are created with a name and listed for
+  anyone to find — joining no longer depends on somebody handing you a
+  six-character code. Only rooms still waiting for players are listed
+  (joining anything else is refused anyway), fullest first. Search covers the
+  name, the code and the host's name; typing a full code also offers a direct
+  join button, since that room might not be listed at all.
+
+- **`SETUP.md`** plus example env files (`server/config/local.env.example`,
+  `client/.env.local.example`), for running this on a machine that isn't the
+  one it was built on. Walked through end to end on a clean clone with no env
+  files at all: install, build, server up, registration and login actually
+  succeeding.
+
+### Fixed
+
+- **`npm run dev` crashed on Node 18** — the exact version this project is
+  pinned to — with `error:0308010C:digital envelope routines::unsupported`.
+  `npm run build` never hit this because its script sets
+  `NODE_OPTIONS=--openssl-legacy-provider` itself; dev mode went straight to
+  `react-scripts start` with no flag at all, so it broke for anyone running
+  it, not just one machine. New `scripts/dev-client.js` sets the same flag
+  dev mode was missing. Verified on Node 18.20.4: compiles and serves clean.
+
+- **A completed hand could be impossible to close after taking from the
+  discard pile.** Ceki eligibility was only recomputed on discard, so melding
+  from the pile changed the hand without ever refreshing it — the player
+  could not announce Ceki, and therefore could not close, until they
+  discarded and waited a full turn.
+
+- **Taking from the discard pile accepted support that wasn't yours.** The
+  rule requires at least two cards from your own hand; the check only counted
+  the selection, and those could include cards swept up from the pile itself
+  — a take could be propped up by one hand card, or by none at all. Both were
+  being accepted.
+
+- **Registration failures read as "Request failed with status code 400".**
+  The server answered "Invalid credentials" for a taken email *or* a taken
+  nickname alike — wording that reads as "wrong password" on a signup form —
+  and the client discarded even that, showing axios's own string instead. Now
+  says which one and what to do; easy to hit since signing in with Google
+  creates an account, so registering afterwards with the same address
+  collides. Also fixes a session-loading bug that cleared the wrong
+  localStorage key on a bad token (`removeItem(token)`, passing the token's
+  value as the key), so a bad token was never actually cleared and every
+  reload retried it.
+
+- **A deploy without a Contentful space got stuck forever on the loading
+  splash**, server perfectly healthy behind it. `createClient` throws on a
+  missing space or access token, and the call happened during render — so a
+  build without `REACT_APP_CONTENTFUL_*` (every deploy but the one it was
+  built on, since that config lives in a gitignored file) died before
+  mounting. The app already ships a local content snapshot meant for exactly
+  this case; the code just never fell back to it.
+
+- Render's blueprint rejected `numInstances` outright on the free plan, which
+  fails the whole blueprint at the first step. Dropped in favour of a comment
+  — the free plan is single-instance regardless, which is required anyway
+  since room state lives in memory.
+
+- `mongodb-memory-server` and `google-auth-library` had drifted to versions
+  requiring Node 20+ and 22+ respectively, newer than the 18.x this project
+  is pinned to — every install warned `EBADENGINE`. Downgraded both to
+  versions that actually support Node 18.
+
+### Removed
+
+- The "Main sebagai Tamu" one-tap throwaway account button. It only ever
+  existed to skip typing credentials while testing against a database that
+  reset on every restart; with real persistence, every tap would leave a
+  permanent account behind instead.
+
 ## v1.3.0
 
 Seating that matches the order play actually goes in, opponent card counts,
