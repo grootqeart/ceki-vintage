@@ -15,6 +15,10 @@ cd ceki-vintage
 npm install
 ```
 
+`npm install` yang pertama memakan waktu **beberapa menit** (sekitar 8 pada
+mesin uji, ~400 paket) karena sekalian memasang dependency client. Prosesnya
+lama tanpa menampilkan apa-apa; itu normal, bukan menggantung.
+
 ## 3. Siapkan konfigurasi
 
 Dua file berisi konfigurasi lokal, dan **keduanya sengaja tidak ikut ke git**,
@@ -94,3 +98,9 @@ Untuk alamat tetap, lihat [DEPLOY.md](DEPLOY.md).
 | Perubahan tidak muncul di `npm start` | Belum `npm run build` |
 | Tombol Google tidak muncul | Wajar tanpa client id; login email/password tetap jalan |
 | Build gagal soal OpenSSL | Versi Node bukan 18 |
+
+---
+
+Langkah-langkah di atas dijalankan apa adanya pada clone bersih tanpa satu pun
+file env, dengan `MONGO_URI` sengaja dikosongkan: install, build, server
+menyala, lalu daftar dan login akun benar-benar berhasil.
